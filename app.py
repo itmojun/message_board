@@ -6,9 +6,14 @@ from flask import Flask, render_template, request, jsonify, session, abort, redi
 import pymysql
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = b'\xa3P\x05\x1a\xf8\xc6\xff\xa4!\xd2\xb5\n\x96\x05\xed\xc3\xc90=\x07\x8d>\x8e\xeb'
+# app.secret_key = os.urandom(24)  # 在多进程环境下有问题，session获取不了，因为每个进程的secret_key不一样，无法解密cookie
 
-db = pymysql.connect(host="localhost", user="root", password="123456", database="mydb", charset="utf8")
+db = pymysql.connect(host="localhost", user="message_board", password="123456", database="message_board", charset="utf8")
+
+@app.route("/")
+def index():
+    return render_template("index.html")
 
 @app.route("/reg", methods=["GET", "POST"])
 def reg_handle():
@@ -63,6 +68,9 @@ def reg_handle():
 @app.route("/user_center")
 def user_center():
     user_info = session.get("user_info")
+    
+    print(user_info)
+    print(session)
 
     if user_info:
         return render_template("user_center.html", uname=user_info.get("uname"))
@@ -133,7 +141,7 @@ def login_handle():
             abort(Response("密码不合法！"))    
         
         cur = db.cursor()
-        cur.execute("SELECT * FROM mb_user WHERE uname=%s", (uname,))
+        cur.execute("SELECT * FROM mb_user WHERE uname=%s AND upass=MD5(%s)", (uname, uname + upass))
         res = cur.fetchone()
         cur.close()
               
@@ -161,10 +169,13 @@ def login_handle():
                 db.commit()
             except Exception as e:
                 print(e)
-
-            return redirect(url_for("user_center"))
+            
+            print("登录成功！", session)
+            # return redirect(url_for("user_center"))
+            return redirect("/user_center")
         else:
             # 登录失败
+            print("登录失败！")
             return render_template("login.html", login_fail=1)
 
 @app.route("/check_uname")
